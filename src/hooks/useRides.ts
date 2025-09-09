@@ -42,13 +42,35 @@ export function useRides() {
     preferences: string[];
     additional_notes: string;
   }) => {
+    // Get the current authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error('You must be logged in to create a ride');
+    }
+
+    // Add driver_id to the ride data
+    const rideDataWithDriver = {
+      ...rideData,
+      driver_id: user.id
+    };
+
+    console.log('Creating ride with data:', rideDataWithDriver); // Debug log
+
     const { data, error } = await supabase
       .from('rides')
-      .insert([rideData])
-      .select()
+      .insert([rideDataWithDriver])
+      .select(`
+        *,
+        driver:profiles(*)
+      `)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error); // Debug log
+      throw error;
+    }
+
     await fetchRides(); // Refresh the list
     return data;
   };
@@ -90,10 +112,18 @@ export function useRides() {
   };
 
   const requestRide = async (rideId: string, message: string = '') => {
+    // Get the current authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error('You must be logged in to request a ride');
+    }
+
     const { data, error } = await supabase
       .from('ride_requests')
       .insert([{
         ride_id: rideId,
+        passenger_id: user.id, // Explicitly set passenger_id
         message,
       }])
       .select()
